@@ -1,0 +1,15 @@
+# Secrets and local config are NEVER committed.
+# API keys, tokens, and credentials live in local files covered here,
+# never in code.
+.env
+.env.*
+*.env
+providers.json
+*.key
+*.pem
+*.p12
+*.pfx
+id_rsa*
+credentials*.json
+secrets*.json
+*.kdbx
