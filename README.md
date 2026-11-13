@@ -16,6 +16,7 @@ Open `yahtzee.html` in any modern browser. No install, no server, no account.
   Slow / Normal / Fast speed
 - Hold dice, drag to rearrange them, one-step undo, confirm before scoring a 0
 - Keyboard dice reorder (arrow keys), Escape-to-close overlays, focus trapping
+- Dice-total readout with the five faces spelled out, in the player's colour
 - Game saves in the browser — close it and Resume picks up the exact turn
 - Game log, end-of-game category breakdown, per-player colours, upper-bonus
   progress, sound volume control and haptics
