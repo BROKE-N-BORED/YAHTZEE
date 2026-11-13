@@ -64,7 +64,17 @@
         font-family:"Titan One","Arial Black",sans-serif; color:var(--muted);
         font-size:clamp(12px,1.6vw,16px); letter-spacing:1px; margin-left:4px;
       }
-      .top-actions{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+      .top-actions{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+      /* ---------- sound volume + haptics controls ---------- */
+      .vol-control{
+        display:flex; align-items:center; gap:7px; min-height:44px;
+        border:2px solid var(--panel-line); border-radius:10px; padding:4px 10px;
+        font-size:11.5px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--muted);
+      }
+      .vol-control input[type="range"]{ width:104px; accent-color:var(--red); cursor:pointer; padding:0; }
+      .vol-control input[type="range"]:disabled{ opacity:.45; cursor:not-allowed; }
+      .vol-control .vol-val{ min-width:38px; text-align:right; color:var(--text); font-size:13px; letter-spacing:0; }
+      @media (max-width:560px){ .vol-control input[type="range"]{ width:76px; } }
       .btn{
         font-family:"Archivo",sans-serif; font-weight:800; letter-spacing:.6px; text-transform:uppercase;
         border:2px solid var(--ink); border-radius:10px; cursor:pointer;
@@ -486,6 +496,8 @@
       <div class="tagline">THIS IS HOW WE ROLL!</div>
       <div class="top-actions">
         <button class="btn ghost" id="soundBtn" type="button">Sound: On</button>
+        <label class="vol-control" for="volumeSlider"><span>Volume</span><input type="range" id="volumeSlider" min="0" max="100" step="5" value="80" aria-label="Sound volume" /><span class="vol-val" id="volumeLabel">80%</span></label>
+        <button class="btn ghost" id="hapticsBtn" type="button" aria-pressed="true">Vibrate: On</button>
         <button class="btn ghost" id="rulesBtn" type="button">How to Play</button>
         <button class="btn" id="newGameBtn" type="button">New Game</button>
       </div>
@@ -810,13 +822,24 @@
     <script>
       "use strict";
       /* ================= sound (Web Audio, synthesized) ================= */
-      var audio = { ctx:null, on:true };
+      var audio = { ctx:null, on:true, volume:0.8, haptics:true };
+      /* Haptics: a short buzz on the actions you can feel — rolling,
+         holding a die, locking in a score — with bigger patterns for
+         a Yahtzee and a win. navigator.vibrate is Android/Chrome
+         only; on devices without it (iOS Safari, desktop) this is a
+         silent no-op. The Vibrate toggle turns it off entirely. */
+      function buzz(pattern){
+        if (!audio.haptics) return;
+        try { if (navigator && typeof navigator.vibrate === "function") navigator.vibrate(pattern); } catch(e){}
+      }
+      function volScale(){ return typeof audio.volume === "number" ? Math.max(0, Math.min(1, audio.volume)) : 1; }
       function ac(){
         if (!audio.ctx){ try { audio.ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){} }
         if (audio.ctx && audio.ctx.state === "suspended") audio.ctx.resume();
         return audio.ctx;
       }
       function noiseBurst(t, dur, freq, gain){
+        gain = gain * volScale(); if (gain <= 0.001) return;
         var ctx = ac(); if (!ctx) return;
         var len = Math.max(1, Math.floor(ctx.sampleRate * dur));
         var buf = ctx.createBuffer(1, len, ctx.sampleRate);
@@ -835,10 +858,11 @@
       }
       function playTick(){ if (!audio.on) return; var ctx = ac(); if (!ctx) return; noiseBurst(ctx.currentTime, 0.045, 2600, 0.16); }
       function tone(freq, t, dur, type, gain){
+        gain = (gain || 0.16) * volScale(); if (gain <= 0.001) return;
         var ctx = ac(); if (!ctx) return;
         var o = ctx.createOscillator(), g = ctx.createGain();
         o.type = type || "triangle"; o.frequency.value = freq;
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain || 0.16, t + 0.02);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(gain, t + 0.02);
         g.gain.exponentialRampToValueAtTime(0.001, t + dur);
         o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t + dur + 0.05);
       }
@@ -974,7 +998,7 @@
         for (var s=0;s<4;s++){ var el = $("pname" + s); if (el) setupNames[s] = el.value; }
         try {
           ls.setItem(PREFS_KEY, JSON.stringify({
-            v:1, soundOn:!!audio.on,
+            v:1, soundOn:!!audio.on, soundVolume:audio.volume, hapticsOn:!!audio.haptics,
             setupCount:setupCount, setupTypes:setupTypes.slice(), setupNames:setupNames.slice(),
             botDifficulty:botDifficulty, botSpeed:botSpeed
           }));
@@ -993,8 +1017,11 @@
           Array.isArray(p.setupNames) && p.setupNames.length === 4 && p.setupNames.every(function(n){ return typeof n === "string"; });
         if (!ok){ try { ls.removeItem(PREFS_KEY); } catch(e){} return; }
         audio.on = p.soundOn;
-        var sb = $("soundBtn");
-        if (sb) sb.textContent = "Sound: " + (audio.on ? "On" : "Off");
+        /* Volume + haptics ride the same blob but stay optional: a
+           blob saved before they existed keeps the defaults here. */
+        if (typeof p.soundVolume === "number" && isFinite(p.soundVolume)) audio.volume = Math.max(0, Math.min(1, p.soundVolume));
+        if (typeof p.hapticsOn === "boolean") audio.haptics = p.hapticsOn;
+        if (typeof renderAudioSettings === "function") renderAudioSettings();
         /* Bot settings ride the same blob, but stay optional: a blob
            saved before they existed (or with a bad value) keeps the
            rest of the preferences and just uses the defaults here. */
@@ -1128,7 +1155,7 @@
         if (from === to || !canRearrange()){ if (typeof layoutDice === "function") layoutDice(true); renderTray(); return; }
         var dv = state.dice.splice(from, 1)[0]; state.dice.splice(to, 0, dv);
         var hv = state.held.splice(from, 1)[0]; state.held.splice(to, 0, hv);
-        playTick();
+        playTick(); buzz(10);
         if (typeof layoutDice === "function") layoutDice(true);
         if (typeof dice3d !== "undefined" && typeof targetQuat === "function"){
           dice3d.forEach(function(d, idx){ if (d && d.anim) d.anim.toQ = targetQuat(state.dice[idx]); });
@@ -1509,6 +1536,7 @@
         saveGame();
         renderAll();
         playClatter(rollingIdx.length + 2);
+        if (curPlayer() && !curPlayer().bot) buzz(30);
         animateRoll(rollingIdx, function(){
           state.rolling = false;
           /* The settled table is DEFINED by the rolled values, not by
@@ -1522,6 +1550,7 @@
           saveGame();
           var p = curPlayer();
           if (isYahtzeeRoll(state.dice)){
+            if (p && !p.bot) buzz([35, 45, 35, 45, 70]);
             if (p.card.yahtzee === 50){ toast("YAHTZEE BONUS! +100 banked when you score", 2600); playYahtzee(); }
             else if (p.card.yahtzee === null){ toast("YAHTZEE! Five of a kind!", 2400); playYahtzee(); }
           }
@@ -1533,7 +1562,7 @@
       function toggleHold(i){
         if (!isHumanTurn() || state.rolling || state.rollsLeft >= 3 || state.rollsLeft < 0) return;
         state.held[i] = !state.held[i];
-        playTick();
+        playTick(); buzz(12);
         setDieHeld(i, state.held[i]);
         renderTray(); renderScorecard();
         saveGame();
@@ -1710,7 +1739,7 @@
         /* The restored dice are final: the player picks a different
            box with them, but does not roll again. Cleared in beginTurn. */
         state.undoLock = true;
-        playTick();
+        playTick(); buzz(18);
         toast("Undone — " + p.name + ", score those same dice in a different box.", 2600);
         renderAll();
         layoutDice(false);
@@ -1938,6 +1967,10 @@
         p.card[catId] = pv.pts;
         if (pv.bonus){ p.yBonusPts += pv.bonus; p.yCount += 1; }
         if (catId === "yahtzee" && pv.pts === 50) playYahtzee(); else playScore();
+        if (!p.bot){
+          if ((catId === "yahtzee" && pv.pts === 50) || pv.bonus) buzz([35, 45, 35, 45, 70]);
+          else buzz(22);
+        }
         gameLog.push({ t:"score", round:state.round, name:p.name, playerIdx:state.cur, cat:catId, pts:pv.pts, bonus:pv.bonus || 0, dice:state.dice.slice() });
         renderGameLog();
         toast(p.name + " scores " + pv.pts + " in " + CAT_BY_ID[catId].name + (pv.bonus ? " (+100 Yahtzee bonus!)" : ""), 2000);
@@ -1988,7 +2021,7 @@
         renderGameLog();
         els.end.hidden = false;
         saveGame();
-        playWin();
+        playWin(); buzz([40, 60, 40, 60, 90]);
       }
 
       /* ================= bots ================= */
@@ -2275,12 +2308,47 @@
       });
       $("rulesBtn").addEventListener("click", function(){ $("rulesOverlay").hidden = false; });
       $("rulesClose").addEventListener("click", function(){ $("rulesOverlay").hidden = true; });
+      /* ================= sound volume + haptics controls =================
+         Volume scales every synthesized effect (clatter, ticks,
+         score/win tones) through volScale() in the audio primitives,
+         so one slider governs the whole game. 0% is silent even with
+         Sound on; the slider disables while Sound is off. Both the
+         volume and the Vibrate toggle persist in the prefs blob. */
+      function renderAudioSettings(){
+        var sb = $("soundBtn");
+        if (sb) sb.textContent = "Sound: " + (audio.on ? "On" : "Off");
+        var pct = Math.round(volScale() * 100);
+        var slider = $("volumeSlider");
+        if (slider){ slider.value = String(pct); slider.disabled = !audio.on; }
+        var lbl = $("volumeLabel");
+        if (lbl) lbl.textContent = pct + "%";
+        var hb = $("hapticsBtn");
+        if (hb){ hb.textContent = "Vibrate: " + (audio.haptics ? "On" : "Off"); hb.setAttribute("aria-pressed", String(!!audio.haptics)); }
+      }
       $("soundBtn").addEventListener("click", function(){
         audio.on = !audio.on;
-        $("soundBtn").textContent = "Sound: " + (audio.on ? "On" : "Off");
+        renderAudioSettings();
         if (typeof savePrefs === "function") savePrefs();
         if (audio.on) playTick();
       });
+      var volSliderEl = $("volumeSlider");
+      if (volSliderEl){
+        volSliderEl.addEventListener("input", function(){
+          audio.volume = Math.max(0, Math.min(1, parseInt(volSliderEl.value, 10) / 100 || 0));
+          renderAudioSettings();
+          if (typeof savePrefs === "function") savePrefs();
+        });
+        /* Preview at the new level when the drag ends, not per step. */
+        volSliderEl.addEventListener("change", function(){ if (audio.on && audio.volume > 0) playTick(); });
+      }
+      var hapticsBtnEl = $("hapticsBtn");
+      if (hapticsBtnEl) hapticsBtnEl.addEventListener("click", function(){
+        audio.haptics = !audio.haptics;
+        renderAudioSettings();
+        if (typeof savePrefs === "function") savePrefs();
+        if (audio.haptics) buzz(25);
+      });
+      renderAudioSettings();
       document.addEventListener("pointerdown", function(){ if (audio.on) ac(); }, { once:true });
     </script>
     <script>

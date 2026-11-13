@@ -17,7 +17,7 @@ Open `yahtzee.html` in any modern browser. No install, no server, no account.
 - Hold dice, drag to rearrange them, one-step undo, confirm before scoring a 0
 - Game saves in the browser — close it and Resume picks up the exact turn
 - Game log, end-of-game category breakdown, per-player colours, upper-bonus
-  progress, sound and haptics
+  progress, sound volume control and haptics
 - The dice are the real Reblend model: black with red edges and white pips,
   built for the Yahtzee Classic look
 
