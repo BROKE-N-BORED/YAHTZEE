@@ -103,7 +103,11 @@
         box-shadow:0 6px 0 rgba(0,0,0,.35); overflow:hidden;
       }
       #sceneWrap{ position:relative; height:clamp(300px,44vh,470px); background:#0d0a08; }
-      #sceneWrap canvas{ display:block; width:100%; height:100%; touch-action:none; }
+      /* pan-y (not none): a vertical swipe over the table still scrolls
+         the page, so the table can never trap the scroll on a phone.
+         Horizontal drags keep coming through as pointer events for
+         rearranging dice, and taps still hold. */
+      #sceneWrap canvas{ display:block; width:100%; height:100%; touch-action:pan-y; }
       .turn-banner{
         position:absolute; top:10px; left:50%; transform:translateX(-50%);
         background:rgba(10,7,5,.82); color:var(--cream); border:1.5px solid var(--red);
@@ -132,7 +136,7 @@
       .die-chip{
         width:56px; height:56px; border-radius:12px; border:2.5px solid #000; cursor:grab;
         background:radial-gradient(circle at 32% 28%, #3a3a3e, #101012 70%);
-        position:relative; padding:7px; box-shadow:0 3px 0 #000; touch-action:none;
+        position:relative; padding:7px; box-shadow:0 3px 0 #000; touch-action:pan-y;
         display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr);
         transition:transform .15s ease, box-shadow .15s ease, border-color .15s ease;
       }
@@ -201,6 +205,14 @@
         aside.panel.drawer-open{
           transform:translateY(0); opacity:1; visibility:visible; pointer-events:auto;
         }
+        /* Drawer reachability fix: .panel is a flex column, so under
+           the drawer's max-height its children SHRANK to fit instead
+           of overflowing — and the scorecard wrapper's overflow:hidden
+           then clipped the whole score table away, leaving nothing to
+           scroll to and no box tappable after a roll. Children keep
+           their natural height now, so the drawer genuinely scrolls
+           through every score box and the game log below them. */
+        aside.panel > *{ flex:0 0 auto; }
         .drawer-head{
           display:flex; align-items:flex-start; justify-content:space-between; gap:10px;
           padding:2px 2px 10px;
@@ -519,7 +531,7 @@
           <div class="hint" id="hintText">Pick your players, then hit <strong>Start Game</strong>.</div>
         </div>
         <div class="tray" id="tray">
-          <span class="tray-label">YOUR DICE — TAP TO HOLD · DRAG TO REARRANGE</span>
+          <span class="tray-label">YOUR DICE — TAP TO HOLD · DRAG OR ← → KEYS TO REARRANGE</span>
         </div>
       </section>
 
@@ -562,9 +574,9 @@
     </nav>
 
     <!-- SETUP -->
-    <div class="overlay" id="setupOverlay">
+    <div class="overlay" id="setupOverlay" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
       <div class="sheet" style="max-width:560px">
-        <h2>Set Up Your Game</h2>
+        <h2 id="setupTitle">Set Up Your Game</h2>
         <p class="lede">Pass-and-play PvP on this device, or roll against the bots. Black dice, red swirls — just like your set.</p>
         <div class="setup-grid">
           <div>
@@ -610,7 +622,7 @@
     </div>
 
     <!-- PASS DEVICE -->
-    <div class="overlay" id="passOverlay" hidden>
+    <div class="overlay" id="passOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="passName">
       <div class="sheet center" style="max-width:440px">
         <p style="font-weight:800;letter-spacing:2px;color:var(--muted);margin:0 0 6px">PASS THE DEVICE</p>
         <div class="pass-name" id="passName">Player 2</div>
@@ -656,7 +668,7 @@
     </div>
 
     <!-- GAME OVER -->
-    <div class="overlay" id="endOverlay" hidden>
+    <div class="overlay" id="endOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="endTitle">
       <div class="sheet" style="max-width:560px">
         <h2 id="endTitle">Game Over</h2>
         <p class="lede" id="endSub">Final standings</p>
@@ -672,14 +684,15 @@
     </div>
 
     <!-- RULES -->
-    <div class="overlay" id="rulesOverlay" hidden>
+    <div class="overlay" id="rulesOverlay" hidden role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
       <div class="sheet" style="max-width:640px">
-        <h2>How to Play</h2>
+        <h2 id="rulesTitle">How to Play</h2>
         <div class="rules-body">
           <p>On your turn, roll the five dice up to <strong>3 times</strong>. After any roll, tap dice to
           <strong>hold</strong> them — held dice hover up front and stay put on the next roll. You can also
           <strong>drag any die left or right</strong> — on the 3D table or on the chips under it — to rearrange
-          your dice into any order you like; the values and holds travel with each die. When you're done rolling, tap a box on the
+          your dice into any order you like; the values and holds travel with each die. On a keyboard, focus a chip
+          under the table and press the <strong>left or right arrow keys</strong> to walk that die along the tray. When you're done rolling, tap a box on the
           score card to lock in that category. Every box is used exactly once, so choose carefully. Scored the wrong box?
           Hit <strong>Undo</strong> to take back your last score and pick a different box for the same dice — but only
           until the next player rolls. After 13 rounds
@@ -1173,6 +1186,21 @@
             var tag = document.createElement("span"); tag.className = "heldtag"; tag.textContent = "HELD"; b.appendChild(tag);
             /* Keyboard activation (click with detail 0) still toggles hold. */
             b.addEventListener("click", function(e){ if (e.detail === 0) toggleHold(trayChips.indexOf(b)); });
+            /* Keyboard reorder: with a chip focused, ← / → moves that
+               die one slot along the tray (its value and held state
+               travel with it, via reorderDice) and focus follows the
+               die to its new slot, so repeated presses keep walking
+               the same die. Enter/Space still toggle hold via click. */
+            b.addEventListener("keydown", function(e){
+              if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+              var idx = trayChips.indexOf(b);
+              if (idx < 0 || b.disabled || !canRearrange()) return;
+              var to = idx + (e.key === "ArrowLeft" ? -1 : 1);
+              if (to < 0 || to > 4) return;
+              e.preventDefault();
+              reorderDice(idx, to);
+              if (trayChips[to]) trayChips[to].focus();
+            });
             /* Pointer: a tap toggles hold, a sideways drag rearranges. */
             var drag = null;
             b.addEventListener("pointerdown", function(e){
@@ -1220,7 +1248,7 @@
           for (var k=0;k<9;k++) pips[k].classList.toggle("f", on.indexOf(k) >= 0);
           chip.classList.toggle("held", state.held[i]);
           chip.disabled = !(isHumanTurn() && state.rollsLeft < 3 && !state.rolling);
-          chip.setAttribute("aria-label", "Die " + (i+1) + " showing " + v + (state.held[i] ? ", held" : ""));
+          chip.setAttribute("aria-label", "Die " + (i+1) + " showing " + v + (state.held[i] ? ", held" : "") + (chip.disabled ? "" : ". Enter toggles hold, left and right arrow keys move this die."));
         }
       }
 
@@ -1471,7 +1499,7 @@
         if (p.bot) els.hint.innerHTML = "<strong>" + escapeHtml(p.name) + "</strong> is thinking… watch the dice.";
         else if (state.rollsLeft === 3) els.hint.innerHTML = "<strong>" + escapeHtml(p.name) + "</strong>, hit <strong>Roll Dice</strong> to start your turn.";
         else if (state.undoLock) els.hint.innerHTML = "Score undone — <strong>those dice are final</strong>, no re-roll. Tap a <strong>different box</strong> on the card to score them.";
-        else if (state.rollsLeft > 0) els.hint.innerHTML = "Tap dice to <strong>hold</strong> them — held dice hover up front. <strong>Drag</strong> a die (on the table or a chip) left or right to <strong>rearrange</strong> your dice, then roll again or tap a score.";
+        else if (state.rollsLeft > 0) els.hint.innerHTML = "Tap dice to <strong>hold</strong> them — held dice hover up front. <strong>Drag</strong> a die (on the table or a chip) left or right — or use <strong>← →</strong> on a focused chip — to <strong>rearrange</strong> your dice, then roll again or tap a score.";
         else els.hint.innerHTML = "No rolls left — <strong>tap a box on the score card</strong> to lock in your score.";
       }
     </script>
@@ -2350,6 +2378,84 @@
       });
       renderAudioSettings();
       document.addEventListener("pointerdown", function(){ if (audio.on) ac(); }, { once:true });
+    </script>
+    <script>
+      "use strict";
+      /* ================= overlay focus trap + Escape-to-close =================
+         Every overlay is modal while it is up: Tab and Shift+Tab cycle
+         inside the topmost visible one instead of leaking to the page
+         behind it, focus moves into the overlay when it opens, and
+         closing it returns focus to whatever had it before. Escape
+         dismisses the dismissible overlays — the rules sheet (new:
+         button, backdrop tap, or Escape), the score-0 confirm (its
+         Go Back action) and the new-game confirm (Keep Playing) —
+         matching the scorecard drawer's existing Escape. The setup,
+         pass-the-device, resume and game-over sheets offer choices
+         with no safe default dismissal, so they trap focus but stay
+         up until a button is tapped. */
+      (function(){
+        var overlays = ["setupOverlay","passOverlay","zeroConfirmOverlay","newGameConfirmOverlay","resumeOverlay","endOverlay","rulesOverlay"]
+          .map(function(id){ return document.getElementById(id); })
+          .filter(function(el){ return !!el; });
+        var returnFocus = {};
+        function isOpen(el){ return el && !el.hidden; }
+        function topOverlay(){
+          var top = null;
+          overlays.forEach(function(el){ if (isOpen(el)) top = el; });
+          return top;
+        }
+        function focusables(el){
+          var nodes = el.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])');
+          var out = [];
+          Array.prototype.forEach.call(nodes, function(n){
+            if (n.getClientRects().length && getComputedStyle(n).visibility !== "hidden") out.push(n);
+          });
+          return out;
+        }
+        overlays.forEach(function(el){
+          new MutationObserver(function(){
+            if (isOpen(el)){
+              if (document.activeElement && !el.contains(document.activeElement)) returnFocus[el.id] = document.activeElement;
+              /* Confirm dialogs already focus their default button on
+                 open; only pull focus in when it is still outside. */
+              if (!el.contains(document.activeElement)){
+                var f = focusables(el);
+                if (f.length) f[0].focus();
+              }
+            } else {
+              var back = returnFocus[el.id];
+              delete returnFocus[el.id];
+              if (back && document.contains(back) && typeof back.focus === "function") back.focus();
+            }
+          }).observe(el, { attributes:true, attributeFilter:["hidden"] });
+        });
+        function closeTop(el){
+          if (!el) return false;
+          if (el.id === "rulesOverlay"){ el.hidden = true; return true; }
+          if (el.id === "zeroConfirmOverlay" && typeof hideZeroConfirm === "function"){ hideZeroConfirm(); return true; }
+          if (el.id === "newGameConfirmOverlay" && typeof hideNewGameConfirm === "function"){ hideNewGameConfirm(); return true; }
+          return false;
+        }
+        document.addEventListener("keydown", function(e){
+          var top = topOverlay();
+          if (!top) return;
+          if (e.key === "Escape"){
+            if (closeTop(top)) e.preventDefault();
+            return;
+          }
+          if (e.key !== "Tab") return;
+          var f = focusables(top);
+          if (!f.length){ e.preventDefault(); return; }
+          var first = f[0], last = f[f.length - 1], active = document.activeElement;
+          if (!top.contains(active)){ e.preventDefault(); (e.shiftKey ? last : first).focus(); return; }
+          if (e.shiftKey && active === first){ e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && active === last){ e.preventDefault(); first.focus(); }
+        }, true);
+        /* The rules sheet also closes on a backdrop tap, like the
+           confirm dialogs already do. */
+        var rulesEl = document.getElementById("rulesOverlay");
+        if (rulesEl) rulesEl.addEventListener("click", function(e){ if (e.target === rulesEl) rulesEl.hidden = true; });
+      })();
     </script>
     <script>
       "use strict";

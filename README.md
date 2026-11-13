@@ -15,6 +15,7 @@ Open `yahtzee.html` in any modern browser. No install, no server, no account.
 - 1–4 players, each Human or Bot; bots in Easy, Medium, and Hard, with
   Slow / Normal / Fast speed
 - Hold dice, drag to rearrange them, one-step undo, confirm before scoring a 0
+- Keyboard dice reorder (arrow keys), Escape-to-close overlays, focus trapping
 - Game saves in the browser — close it and Resume picks up the exact turn
 - Game log, end-of-game category breakdown, per-player colours, upper-bonus
   progress, sound volume control and haptics
