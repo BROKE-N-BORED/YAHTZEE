@@ -23,6 +23,15 @@ Open `yahtzee.html` in any modern browser. No install, no server, no account.
 - Game saves in the browser — close it and Resume picks up the exact turn
 - Game log, end-of-game category breakdown, per-player colours, upper-bonus
   progress, sound volume control and haptics
+- Guided first turn that teaches by doing; How to Play stays as a reference
+- Accessibility presets: Big Text, Reduced Motion, High Contrast, one tap each
+- Full keyboard play: R rolls, arrows move across dice and score boxes,
+  Enter scores, ? lists every shortcut
+- Tap the dice cup to roll; drag dice with a spring settle; long-press a
+  score box to preview totals and the bonus before committing
+- Toasts with Undo, glanceable standings (ahead/behind by N), a bento
+  end-of-game with a hero winner tile
+- On phones, Sound, Volume and Vibrate live in one Settings sheet
 - The dice are the real Reblend model: black with red edges and white pips,
   built for the Yahtzee Classic look
 
