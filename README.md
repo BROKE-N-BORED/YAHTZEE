@@ -32,10 +32,12 @@ Open `yahtzee.html` in any modern browser. No install, no server, no account.
 - Toasts with Undo, glanceable standings (ahead/behind by N), a bento
   end-of-game with a hero winner tile
 - On phones, Sound, Volume and Vibrate live in one Settings sheet
-- The dice are the high-quality Reblend v3 model: flush inlaid red bands
+- The dice are the high-quality Reblend v4 model: flush inlaid red bands
   with a different swirl on each edge, flat white pips, taller dome, true
-  colors. The table is a real Reblend scene: green felt, wood rim, and a
-  dice cup you can tap to roll
+  colors, clean bands with no speck marks. The table is a real Reblend
+  scene: green felt, wood rim, and a dice cup you can tap to roll
+- The camera frames the full dice row and cup on phone screens, and the
+  felt renders at its true dark casino green
 
 ## Status
 
