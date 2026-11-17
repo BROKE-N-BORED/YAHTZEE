@@ -48,11 +48,14 @@ Open `yahtzee.html` in any modern browser. No install, no server, no account.
   row and explains the bonus and the joker rule; the game log has a
   Comfortable/Compact density switch and bots narrate their holds as they
   make them
-- The dice are the high-quality Reblend v5 model: flush inlaid red bands
-  with a different swirl on each edge, flat white pips, taller dome, true
-  colors, clean bands with no speck marks, and a subtle textured sheen
-  on the black body. The table is a real Reblend scene: green felt,
-  wood rim, and a dice cup you can tap to roll
+- The dice and table are the Reblend v6 model (PO5 redesign): the table is
+  bigger and the cup is smaller, so the proportions read right; the felt,
+  wood, and cup carry PO5 wear (dirt, grime, edge wear); the die bands
+  are a warmer orange-red and the die edges catch more light from the
+  wear. Flush inlaid bands with a different swirl on each edge, flat
+  white pips, taller dome, true colors, clean bands with no speck marks.
+  The table is a real Reblend scene: green felt, wood rim, and a dice
+  cup you can tap to roll
 - The camera frames the full dice row and cup on phone screens, and the
   felt renders at its true dark casino green
 
