@@ -1,0 +1,17 @@
+# Yahtzee online rooms — Cloudflare Worker + Durable Object.
+# No secrets, no variables, nothing sensitive in this file. Nothing to add
+# before deploying: `wrangler deploy` from this directory is the whole step.
+# Deployed URL: https://yahtzee-rooms.<your-subdomain>.workers.dev
+
+name = "yahtzee-rooms"
+main = "src/index.js"
+compatibility_date = "2026-11-17"
+workers_dev = true
+
+[[durable_objects.bindings]]
+name = "YAHTZEE_ROOM"
+class_name = "YahtzeeRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["YahtzeeRoom"]
